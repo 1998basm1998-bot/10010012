@@ -336,7 +336,17 @@ function openEditProduct(id) {
     
     tempProdImg = p.img;
     if(p.img && !p.img.includes('No+Image')) {
-        document.getElementById('prodImgPreview').innerHTML = `<img src="${p.img}" style="width:100%; height:100%; object-fit:cover; border-radius:15px; pointer-events:none;">`;
+        let img = new Image();
+        img.onload = function() {
+            currentUploadImage = img;
+            imgScale = 1;
+            imgPanX = 0;
+            imgPanY = 0;
+            document.getElementById('imageZoomContainer').style.display = 'flex';
+            document.getElementById('imgZoomSlider').value = 1;
+            updateImagePreview();
+        };
+        img.src = p.img;
     } else {
         document.getElementById('prodImgPreview').innerHTML = '<i class="fas fa-camera"></i>';
     }
@@ -443,7 +453,8 @@ function renderProducts() {
                     <button class="btn-3d btn-red" style="width: 40px; padding: 5px;" onclick="changeQtyById(${p.id}, -0.5)">-</button>
                     <span style="font-weight: bold; font-size: 18px; cursor: pointer; border-bottom: 1px dashed var(--primary-green);" onclick="editQtyById(${p.id})">${cartItem.qty}</span>
                     <button class="btn-3d btn-blue" style="width: 40px; padding: 5px;" onclick="changeQtyById(${p.id}, 0.5)">+</button>
-                </div>`;
+                </div>
+                <input type="text" placeholder="ملاحظة (اختياري)..." value="${cartItem.note || ''}" onchange="updateItemNote(${p.id}, this.value)" style="width: 100%; margin-top: 8px; padding: 6px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-light); text-align: center; font-size: 12px; outline: none; transition: 0.3s;" onfocus="this.style.borderColor='var(--primary-green)'" onblur="this.style.borderColor='var(--border-color)'">`;
             } else {
                 posActionHtml = `<button class="btn-3d btn-green" style="margin-top: 10px; width: 100%;" onclick="triggerFlip(this, () => addToCart(${p.id}))"><i class="fas fa-cart-plus"></i> أضف للسلة</button>`;
             }
@@ -586,6 +597,15 @@ function changeQtyById(productId, change) {
     }
 }
 
+function updateItemNote(productId, note) {
+    let item = db.cart.find(c => c.id == productId);
+    if(item) {
+        item.note = note;
+        saveLocal();
+        updateCartUI();
+    }
+}
+
 function parseArabicLocaleNumber(str) {
     if (!str) return NaN;
     let converted = str.replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
@@ -626,7 +646,8 @@ function updateCartUI() {
         cartHtml += `
             <div class="cart-item">
                 <div style="flex: 1;">
-                    <div style="font-weight: bold; font-size: 15px; margin-bottom: 5px;">${item.name}</div>
+                    <div style="font-weight: bold; font-size: 15px; margin-bottom: 2px;">${item.name}</div>
+                    ${item.note ? `<div style="font-size: 11px; color: var(--primary-green); margin-bottom: 3px;">ملاحظة: ${item.note}</div>` : ''}
                     <div style="font-size: 13px; color: var(--text-muted);">السعر: <span class="editable-price" onclick="editPrice(${index})">${item.price.toLocaleString()}</span></div>
                 </div>
                 <div class="cart-item-controls">
@@ -702,7 +723,7 @@ function showOrderDetails(order) {
     let itemsHtml = "";
     order.items.forEach(item => {
         let itemTotal = item.price * item.qty;
-        itemsHtml += `<div class="order-item-row"><span>${item.name} <span style="color:var(--text-muted); font-size:11px;">x${item.qty}</span></span><span>${itemTotal.toLocaleString()} د.ع</span></div>`;
+        itemsHtml += `<div class="order-item-row"><span>${item.name} ${item.note ? `<span style="font-size:11px; color:var(--primary-green);">(${item.note})</span>` : ''} <span style="color:var(--text-muted); font-size:11px;">x${item.qty}</span></span><span>${itemTotal.toLocaleString()} د.ع</span></div>`;
     });
     document.getElementById('od-items-list').innerHTML = itemsHtml;
 
@@ -715,7 +736,7 @@ function showOrderDetails(order) {
 
 function exportToPDF(order) {
     let printWindow = window.open('', '_blank'); let itemsRows = "";
-    order.items.forEach((item, i) => { itemsRows += `<tr><td style="border:1px solid #ddd; padding:8px;">${i+1}</td><td style="border:1px solid #ddd; padding:8px;">${item.name}</td><td style="border:1px solid #ddd; padding:8px;">${item.qty}</td><td style="border:1px solid #ddd; padding:8px;">${item.price.toLocaleString()}</td><td style="border:1px solid #ddd; padding:8px;">${(item.price * item.qty).toLocaleString()}</td></tr>`; });
+    order.items.forEach((item, i) => { itemsRows += `<tr><td style="border:1px solid #ddd; padding:8px;">${i+1}</td><td style="border:1px solid #ddd; padding:8px;">${item.name}${item.note ? `<br><span style="font-size:11px; color:#555;">${item.note}</span>` : ''}</td><td style="border:1px solid #ddd; padding:8px;">${item.qty}</td><td style="border:1px solid #ddd; padding:8px;">${item.price.toLocaleString()}</td><td style="border:1px solid #ddd; padding:8px;">${(item.price * item.qty).toLocaleString()}</td></tr>`; });
 
     let html = `
     <html dir="rtl" lang="ar">
@@ -751,7 +772,7 @@ function exportToPDF(order) {
 
 function shareWhatsApp(order) {
     let text = `*فاتورة مبيعات*\nرقم: ${order.id}\nالعميل: ${order.customer}\nالتاريخ: ${order.date} ${order.time}\n\n*المشتريات:*\n`;
-    order.items.forEach((item, i) => { text += `${i+1}. ${item.name} - العدد: ${item.qty} - السعر: ${(item.price * item.qty).toLocaleString()} د.ع\n`; });
+    order.items.forEach((item, i) => { text += `${i+1}. ${item.name}${item.note ? ` (${item.note})` : ''} - العدد: ${item.qty} - السعر: ${(item.price * item.qty).toLocaleString()} د.ع\n`; });
     text += `\n*الإجمالي الكلي: ${order.total.toLocaleString()} د.ع*\nحالة الدفع: ${order.status}`;
     let url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     if(order.phone) url = `https://api.whatsapp.com/send?phone=${order.phone.replace(/^0/, '+964')}&text=${encodeURIComponent(text)}`;

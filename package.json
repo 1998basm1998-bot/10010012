@@ -1,0 +1,8 @@
+{
+  "name": "pos-system",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npx serve -l 3000",
+    "build": "mkdir -p dist && cp index.html style.css script.js dist/"
+  }
+}
