@@ -362,8 +362,7 @@ function saveProduct() {
     if(!name || isNaN(price)) { customAlert('يرجى إدخال اسم وسعر المنتج بشكل صحيح.'); return; }
     
     if(currentUploadImage) {
-        let size = Math.max(currentUploadImage.width, currentUploadImage.height);
-        size = Math.max(size, 800);
+        let size = 800;
         let canvas = document.createElement('canvas');
         canvas.width = size;
         canvas.height = size;
@@ -382,7 +381,7 @@ function saveProduct() {
         let drawY = (size - finalHeight) / 2 + (imgPanY * previewScaleRatio);
         
         ctx.drawImage(currentUploadImage, drawX, drawY, finalWidth, finalHeight);
-        tempProdImg = canvas.toDataURL('image/jpeg', 0.95);
+        tempProdImg = canvas.toDataURL('image/jpeg', 0.85);
     }
     
     let imgToSave = tempProdImg || 'https://placehold.co/400x400/2a2a2a/ffffff/png?text=No+Image';
@@ -411,13 +410,22 @@ function deleteProduct(id) {
     renderProducts(); updateCartUI(); customAlert('تم حذف المنتج بنجاح!');
 }
 
+function toggleProductLock(id) {
+    let p = db.products.find(x => x.id == id);
+    if(p) {
+        p.isHidden = !p.isHidden;
+        saveLocal();
+        renderProducts();
+    }
+}
+
 function renderProducts() {
     const posGrid = document.getElementById('pos-products-grid');
     const adminGrid = document.getElementById('admin-products-grid');
     posGrid.innerHTML = ''; adminGrid.innerHTML = '';
 
     if(db.products.length === 0) {
-        posGrid.innerHTML = '<p style="grid-column: span 2; text-align: center; color: var(--text-muted);">لا توجد منتجات حالياً.</p>';
+        posGrid.innerHTML = '<p style="grid-column: span 3; text-align: center; color: var(--text-muted);">لا توجد منتجات حالياً.</p>';
         adminGrid.innerHTML = '<p style="grid-column: span 2; text-align: center; color: var(--text-muted);">لا توجد منتجات حالياً.</p>';
         return;
     }
@@ -428,20 +436,27 @@ function renderProducts() {
 
     db.products.forEach(p => {
         let catBadge = p.category ? `<div style="font-size:11px; color:var(--text-muted); margin-bottom:5px;">${p.category}</div>` : '';
+        let isLocked = p.isHidden ? true : false;
+        let imgOpacity = isLocked ? "0.4" : "1";
+        let lockIcon = isLocked ? "fa-lock" : "fa-unlock";
+        let lockColor = isLocked ? "var(--text-muted)" : "var(--primary-green)";
         
         adminGridHtml += `
-            <div class="card">
-                <img src="${p.img}" alt="صورة">
-                <h3>${p.name}</h3>
-                ${catBadge}
-                <div class="price">${p.price.toLocaleString()} د.ع</div>
+            <div class="card" style="position: relative;">
+                <div style="position: absolute; top: 15px; left: 15px; z-index: 2; background: rgba(0,0,0,0.5); border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: ${lockColor};" onclick="toggleProductLock(${p.id})">
+                    <i class="fas ${lockIcon}"></i>
+                </div>
+                <img src="${p.img}" alt="صورة" style="opacity: ${imgOpacity}; transition: opacity 0.3s;">
+                <h3 style="opacity: ${imgOpacity}; transition: opacity 0.3s;">${p.name}</h3>
+                <div style="opacity: ${imgOpacity}; transition: opacity 0.3s;">${catBadge}</div>
+                <div class="price" style="opacity: ${imgOpacity}; transition: opacity 0.3s;">${p.price.toLocaleString()} د.ع</div>
                 <div class="action-btns" style="margin-top: auto;">
                     <button class="btn-3d btn-blue" style="padding: 8px;" onclick="triggerFlip(this, () => openEditProduct(${p.id}))"><i class="fas fa-pen"></i></button>
                     <button class="btn-3d btn-red" style="padding: 8px;" onclick="triggerFlip(this, () => deleteProduct(${p.id}))"><i class="fas fa-trash"></i></button>
                 </div>
             </div>`;
 
-        if (activeCategoryFilter === 'الكل' || p.category === activeCategoryFilter) {
+        if (!p.isHidden && (activeCategoryFilter === 'الكل' || p.category === activeCategoryFilter)) {
             posHasProducts = true;
             let cartItem = db.cart.find(c => c.id == p.id);
             let posActionHtml = '';
@@ -473,7 +488,7 @@ function renderProducts() {
     });
 
     if (!posHasProducts && db.products.length > 0) {
-        posGridHtml = '<p style="grid-column: span 2; text-align: center; color: var(--text-muted); margin-top: 20px;">لا توجد منتجات مسجلة في هذه الفئة.</p>';
+        posGridHtml = '<p style="grid-column: span 3; text-align: center; color: var(--text-muted); margin-top: 20px;">لا توجد منتجات مسجلة في هذه الفئة.</p>';
     }
 
     posGrid.innerHTML = posGridHtml;
@@ -752,7 +767,7 @@ function exportToPDF(order) {
             td{border:1px solid #ddd; padding:8px;}
         </style>
     </head>
-    <body onload="window.print(); window.close();">
+    <body onload="window.print();">
         <div class="header-info">
             <h1>مكتب الجوهرة للتجارة لحلويات والمشروبات</h1>
             <p>بإدارة: حسين</p>
