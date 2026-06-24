@@ -602,7 +602,8 @@ function addToCart(productId) {
     let existing = db.cart.find(c => c.id == productId);
     if(existing) { existing.qty++; } else { db.cart.push({ ...product, qty: 1 }); }
     saveLocal();
-    updateCartUI(); 
+    updateCartUI();
+    renderProducts();
 }
 
 function changeQtyById(productId, change) {
